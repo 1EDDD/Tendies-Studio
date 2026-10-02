@@ -40,6 +40,9 @@ jobs:
           rm -rf "$RUNNER_TEMP/Payload" "$RUNNER_TEMP/export"
           mkdir -p "$RUNNER_TEMP/Payload" "$RUNNER_TEMP/export"
           cp -R "$APP_PATH" "$RUNNER_TEMP/Payload/"
+          mkdir -p "$RUNNER_TEMP/Payload/TendiesStudio.app/StarterLibrary"
+          cp -R Resources/StarterLibrary/*.png "$RUNNER_TEMP/Payload/TendiesStudio.app/StarterLibrary/"
+          cp -R Resources/StarterLibrary/index.json "$RUNNER_TEMP/Payload/TendiesStudio.app/StarterLibrary/"
           /usr/bin/ditto -c -k --sequesterRsrc --keepParent "$RUNNER_TEMP/Payload" "$RUNNER_TEMP/export/Tendies-Studio-iPadOS.ipa"
           unzip -t "$RUNNER_TEMP/export/Tendies-Studio-iPadOS.ipa" >/dev/null
 
