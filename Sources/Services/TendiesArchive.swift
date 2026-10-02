@@ -71,7 +71,7 @@ struct TendiesArchive {
         guard let enumerator = FileManager.default.enumerator(
             at: folder,
             includingPropertiesForKeys: [.isRegularFileKey],
-            options: [.skipsHiddenFiles]
+            options: []
         ) else { throw TendiesArchiveError.exportFailed }
 
         for case let fileURL as URL in enumerator {
