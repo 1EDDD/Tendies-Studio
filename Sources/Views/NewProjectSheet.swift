@@ -109,18 +109,20 @@ struct NewProjectSheet: View {
                 allowedContentTypes: [.image],
                 allowsMultipleSelection: false
             ) { result in
-                if case .success(let urls) = result, let url = urls.first,
-                   let data = try? Data(contentsOf: url) {
-                    imageData = data
-                    imageName = url.deletingPathExtension().lastPathComponent
+                if case .success(let urls) = result, let url = urls.first {
+                    do {
+                        imageData = try MediaImportService.readData(from: url)
+                        imageName = MediaImportService.suggestedName(for: url)
+                    } catch {
+                    }
                 }
             }
             .sheet(isPresented: $showingPath) {
                 ManualPathSheet { path in
                     let url = URL(fileURLWithPath: path)
-                    guard let data = try? Data(contentsOf: url) else { return }
+                    guard let data = try? MediaImportService.readData(from: url) else { return }
                     imageData = data
-                    imageName = url.deletingPathExtension().lastPathComponent
+                    imageName = MediaImportService.suggestedName(for: url)
                 }
             }
         }
