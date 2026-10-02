@@ -9,7 +9,7 @@ settings:
     SWIFT_VERSION: "5.10"
     TARGETED_DEVICE_FAMILY: "2"
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
-    GENERATE_INFOPLIST_FILE: YES
+    GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_KEY_CFBundleDisplayName: Tendies Studio
     INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad:
       - UIInterfaceOrientationPortrait
@@ -22,6 +22,8 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+    info:
+      path: Sources/Info.plist
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.1eddd.tendiesstudio
