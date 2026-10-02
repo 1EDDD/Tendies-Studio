@@ -115,7 +115,11 @@ struct AssetBrowserView: View {
             allowsMultipleSelection: false
         ) { result in
             if case .success(let urls) = result, let url = urls.first, let targetPath {
-                workspace.replaceImage(at: targetPath, with: url)
+                if let root = workspace.workspaceURL,
+               let layer = workspace.layers.first(where: { $0.imageFilePath == root.appendingPathComponent(targetPath).path }),
+               let data = try? Data(contentsOf: url) {
+                workspace.replaceImage(for: layer.id, with: data)
+            }
             }
             if case .failure(let error) = result {
                 workspace.errorMessage = error.localizedDescription
