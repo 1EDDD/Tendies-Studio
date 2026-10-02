@@ -312,10 +312,10 @@ final class WorkspaceStore: ObservableObject {
     ) throws {
         var xml = try String(contentsOf: camlFile, encoding: .utf8)
         let layer = """
-        <CALayer id="\(id)" name="\(xmlEscape(name))" bounds="0 0 \(n(width)) \(n(height))" position="\(n(width / 2)) \(n(height / 2))" zPosition="100" geometryFlipped="0" opacity="1" transform.rotation.z="0" allowsEdgeAntialiasing="1" allowsGroupOpacity="1" contentsFormat="RGBA8" cornerCurve="circular">
-          <contents><CGImage src="\(imageSource)"/></contents>
-        </CALayer>
-        """
+<CALayer id="\(id)" name="\(xmlEscape(name))" bounds="0 0 \(n(width)) \(n(height))" position="\(n(width / 2)) \(n(height / 2))" zPosition="100" geometryFlipped="0" opacity="1" transform.rotation.z="0" allowsEdgeAntialiasing="1" allowsGroupOpacity="1" contentsFormat="RGBA8" cornerCurve="circular">
+  <contents><CGImage src="\(imageSource)"/></contents>
+</CALayer>
+"""
 
         guard let end = xml.range(of: "</sublayers>") else {
             throw TendiesArchiveError.exportFailed
