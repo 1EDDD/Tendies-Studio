@@ -1,18 +1,38 @@
 # Tendies Studio
 
-A native iPadOS workspace for inspecting, creating from templates, editing, validating, and exporting PosterBoard `.tendies` packages.
+A native iPadOS workspace for PosterBoard `.tendies` packages. The product has two equal workflows:
 
-## Status
+1. **Open and edit an existing package**: inspect its structure, preview assets, edit supported metadata and layers, validate it, and export a new package while preserving unknown files.
+2. **Create a wallpaper from scratch**: choose an image, configure a supported layout and layers, preview the result, build a valid package from a known-good PosterBoard template, validate it, and export `.tendies`.
 
-Early development scaffold. The current app provides a native iPad interface, ZIP-based package inspection, safe asset replacement, and archive export. Full CAML editing and validated from-scratch descriptor generation are planned next.
+## Offline-first requirement
 
-## Requirements
+All end-user features must run locally on the iPad. No account, cloud service, analytics, remote API, or network connection may be required to import, create, edit, preview, validate, save, or export a project. Network access is limited to optional development/update distribution workflows, never runtime functionality.
+
+## Installation target
+
+- iPadOS only
+- IPA intended for sideloading through LiveContainer
+- The app must not require an Apple Developer subscription for its everyday offline workflow. IPA signing/import requirements depend on the user's LiveContainer and signing setup.
+- Minimum target: iPadOS 17+
+
+## Development status
+
+This repository is an early SwiftUI scaffold, not a finished editor. It currently contains ZIP-based package import/export, a basic package browser, asset thumbnails, and structural checks. CAML editing, editable layer controls, the image-to-template creation flow, and compatibility-tested descriptor generation are not implemented yet. No successful Xcode build or installable IPA is claimed at this stage.
+
+## Planned milestones
+
+- **M1: Reliable package workspace**: robust import/export, package safety checks, persistent local projects, and clear descriptor/container detection.
+- **M2: Existing-package editor**: asset replacement, metadata inspection/editing, CAML-aware layer controls, and preservation of unsupported data.
+- **M3: New wallpaper wizard**: image import, crop/position controls, foreground/background layer setup, preview, and generation from validated templates.
+- **M4: Compatibility and delivery**: test generated packages against known-good examples and supported iPadOS versions; produce an IPA suitable for the LiveContainer workflow.
+
+## Build requirements
 
 - Xcode 16+
-- iPadOS 17+
 - XcodeGen
 
-## Generate the Xcode project
+Generate the project:
 
 ```sh
 brew install xcodegen
@@ -20,16 +40,14 @@ xcodegen generate
 open TendiesStudio.xcodeproj
 ```
 
-## Build
+Build:
 
 ```sh
 xcodebuild -project TendiesStudio.xcodeproj -scheme TendiesStudio -destination 'generic/platform=iOS' -configuration Release build
 ```
 
-To export a signed IPA, configure an Apple Distribution certificate and provisioning profile in Xcode or the GitHub Actions secrets documented in `.github/workflows/ios.yml`.
+## Package format notes
 
-## Package format
+A `.tendies` file is ZIP-based, but a ZIP archive is not automatically a valid PosterBoard package. Descriptor and container packages have different restore semantics. New packages must be generated from validated templates and retain the required descriptor metadata, identifiers, CAML resources, and assets.
 
-Tendies Studio treats a `.tendies` file as a ZIP-based package and preserves unknown files when editing. Descriptor packages and container packages have different restore semantics. Do not assume that an arbitrary folder is a valid PosterBoard descriptor: use a known-good template and validate all required metadata before export.
-
-See [Nugget documentation](https://github.com/leminlimez/Nugget/blob/main/documentation.md) for the documented package conventions.
+See [Nugget documentation](https://github.com/leminlimez/Nugget/blob/main/documentation.md) for documented package conventions.
