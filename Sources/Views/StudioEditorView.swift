@@ -286,12 +286,12 @@ struct StudioInspector: View {
 
                         GroupBox("Transform") {
                             VStack(spacing: 10) {
-                                field("X", layer.x) { update(layer) { $0.x = $1 } }
-                                field("Y", layer.y) { update(layer) { $0.y = $1 } }
-                                field("Width", layer.width) { update(layer) { $0.width = max(1, $1) } }
-                                field("Height", layer.height) { update(layer) { $0.height = max(1, $1) } }
-                                field("Rotation", layer.rotation) { update(layer) { $0.rotation = $1 } }
-                                field("Z", layer.zPosition) { update(layer) { $0.zPosition = $1 } }
+                                field("X", layer.x) { value in update(layer) { $0.x = value } }
+                                field("Y", layer.y) { value in update(layer) { $0.y = value } }
+                                field("Width", layer.width) { value in update(layer) { $0.width = max(1, value) } }
+                                field("Height", layer.height) { value in update(layer) { $0.height = max(1, value) } }
+                                field("Rotation", layer.rotation) { value in update(layer) { $0.rotation = value } }
+                                field("Z", layer.zPosition) { value in update(layer) { $0.zPosition = value } }
                             }
                         }
 
