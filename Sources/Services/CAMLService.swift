@@ -31,19 +31,22 @@ final class CAMLParser: NSObject, XMLParserDelegate {
         qualifiedName qName: String?,
         attributes attributeDict: [String : String] = [:]
     ) {
-        if elementName == "contents" {
+        let localName = elementName.split(separator: ":").last.map(String.init) ?? elementName
+
+        if localName == "contents" {
             insideContents = true
             return
         }
 
-        if elementName == "CGImage", insideContents,
+        if localName == "CGImage", insideContents,
            let src = attributeDict["src"],
            let index = stack.last {
             layers[index].imageSource = src
+            layers[index].resolvedImagePath = resolveAssetPath(src)
             return
         }
 
-        guard elementName == "CALayer" else { return }
+        guard localName == "CALayer" else { return }
 
         let id = attributeDict["id"] ?? UUID().uuidString
         let name = attributeDict["name"] ?? "Layer"
@@ -77,11 +80,33 @@ final class CAMLParser: NSObject, XMLParserDelegate {
         namespaceURI: String?,
         qualifiedName qName: String?
     ) {
-        if elementName == "contents" {
+        let localName = elementName.split(separator: ":").last.map(String.init) ?? elementName
+
+        if localName == "contents" {
             insideContents = false
-        } else if elementName == "CALayer", !stack.isEmpty {
+        } else if localName == "CALayer", !stack.isEmpty {
             stack.removeLast()
         }
+    }
+
+    private func resolveAssetPath(_ source: String) -> String? {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let candidates: [URL]
+        if trimmed.hasPrefix("/") {
+            candidates = [URL(fileURLWithPath: trimmed)]
+        } else {
+            let direct = currentCAFolder.appendingPathComponent(trimmed).standardizedFileURL
+            let lastComponent = currentCAFolder.appendingPathComponent(URL(fileURLWithPath: trimmed).lastPathComponent).standardizedFileURL
+            candidates = [direct, lastComponent]
+        }
+
+        for url in candidates where FileManager.default.fileExists(atPath: url.path) {
+            return url.path
+        }
+
+        return nil
     }
 
     private static func parsePair(_ value: String?) -> (x: Double, y: Double) {
