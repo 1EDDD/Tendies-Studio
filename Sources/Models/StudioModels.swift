@@ -48,6 +48,7 @@ struct StudioLayer: Identifiable, Hashable {
     var camlPath: String
     var caFolderPath: String
     var imageSource: String?
+    var resolvedImagePath: String?
     var x: Double
     var y: Double
     var width: Double
@@ -58,8 +59,20 @@ struct StudioLayer: Identifiable, Hashable {
     var hidden: Bool
 
     var imageFilePath: String? {
+        if let resolvedImagePath, !resolvedImagePath.isEmpty {
+            return resolvedImagePath
+        }
+
         guard let imageSource, !imageSource.isEmpty else { return nil }
-        return caFolderPath + "/" + imageSource
+        return URL(fileURLWithPath: caFolderPath)
+            .appendingPathComponent(imageSource)
+            .standardizedFileURL
+            .path
+    }
+
+    var hasValidImage: Bool {
+        guard let imageFilePath else { return false }
+        return FileManager.default.fileExists(atPath: imageFilePath)
     }
 
     static let empty = StudioLayer(
@@ -69,6 +82,7 @@ struct StudioLayer: Identifiable, Hashable {
         camlPath: "",
         caFolderPath: "",
         imageSource: nil,
+        resolvedImagePath: nil,
         x: 0,
         y: 0,
         width: 100,
@@ -99,7 +113,7 @@ enum StudioPanel: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .design: return "Design"
+        case .design: return "Studio"
         case .assets: return "Assets"
         case .package: return "Package"
         case .validation: return "Validate"
@@ -108,10 +122,10 @@ enum StudioPanel: String, CaseIterable, Identifiable {
 
     var symbol: String {
         switch self {
-        case .design: return "rectangle.3.group"
-        case .assets: return "photo.on.rectangle"
-        case .package: return "shippingbox"
-        case .validation: return "checkmark.shield"
+        case .design: return "rectangle.3.group.fill"
+        case .assets: return "photo.stack"
+        case .package: return "shippingbox.fill"
+        case .validation: return "checkmark.shield.fill"
         }
     }
 }
