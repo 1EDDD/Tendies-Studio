@@ -6,6 +6,7 @@ struct ContentView: View {
     @State private var showingImporter = false
     @State private var showingExporter = false
     @State private var selectedTab = "Workspace"
+    @State private var exportDocument: TendiesExportDocument?
 
     var body: some View {
         NavigationSplitView {
@@ -15,14 +16,14 @@ struct ContentView: View {
             workspaceView
         }
         .tint(.cyan)
-        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.zip, .data], allowsMultipleSelection: false) { result in
+        .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.tendies, .zip, .data], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { workspace.open(url) }
             if case .failure(let error) = result { workspace.errorMessage = error.localizedDescription }
         }
         .fileExporter(
             isPresented: $showingExporter,
-            document: TendiesExportDocument(),
-            contentType: .data,
+            document: exportDocument,
+            contentType: .tendies,
             defaultFilename: "\(workspace.projectName).tendies"
         ) { result in
             if case .failure(let error) = result { workspace.errorMessage = error.localizedDescription }
@@ -38,9 +39,27 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { showingImporter = true } label: { Label("Open", systemImage: "folder") }
-                Button { showingExporter = true } label: { Label("Export", systemImage: "square.and.arrow.up") }
+                Button { prepareExport() } label: { Label("Export", systemImage: "square.and.arrow.up") }
                     .disabled(workspace.workspaceURL == nil || workspace.isBusy)
             }
+        }
+    }
+
+    private func prepareExport() {
+        guard let root = workspace.workspaceURL else { return }
+        workspace.isBusy = true
+        Task {
+            do {
+                let output = FileManager.default.temporaryDirectory.appendingPathComponent("\(workspace.projectName).tendies")
+                try? FileManager.default.removeItem(at: output)
+                try await Task.detached(priority: .userInitiated) { try TendiesArchive.create(from: root, to: output) }.value
+                let data = try Data(contentsOf: output)
+                exportDocument = TendiesExportDocument(data: data)
+                showingExporter = true
+            } catch {
+                workspace.errorMessage = error.localizedDescription
+            }
+            workspace.isBusy = false
         }
     }
 
