@@ -23,7 +23,9 @@ targets:
     sources:
       - path: Sources
     resources:
-      - path: Resources/StarterLibrary
+      - path: Resources/StarterLibrary/Aurora-Night.png
+      - path: Resources/StarterLibrary/Ultraviolet-Glass.png
+      - path: Resources/StarterLibrary/index.json
     info:
       path: Sources/Info.plist
     settings:
