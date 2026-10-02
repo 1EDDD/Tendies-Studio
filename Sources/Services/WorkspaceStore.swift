@@ -354,7 +354,7 @@ final class WorkspaceStore: ObservableObject {
     private func xmlEscape(_ value: String) -> String {
         value
             .replacingOccurrences(of: "&", with: "&amp;")
-            .replacingOccurrences(of: """, with: "&quot;")
+            .replacingOccurrences(of: "\"", with: "&quot;")
             .replacingOccurrences(of: "<", with: "&lt;")
             .replacingOccurrences(of: ">", with: "&gt;")
     }
