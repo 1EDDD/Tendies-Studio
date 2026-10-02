@@ -7,7 +7,7 @@ options:
 settings:
   base:
     SWIFT_VERSION: "5.10"
-    TARGETED_DEVICE_FAMILY: "2"
+    TARGETED_DEVICE_FAMILY: 2
     IPHONEOS_DEPLOYMENT_TARGET: "17.0"
     GENERATE_INFOPLIST_FILE: NO
     INFOPLIST_KEY_CFBundleDisplayName: Tendies Studio
@@ -26,6 +26,7 @@ targets:
       path: Sources/Info.plist
     settings:
       base:
+        TARGETED_DEVICE_FAMILY: 2
         PRODUCT_BUNDLE_IDENTIFIER: com.1eddd.tendiesstudio
         INFOPLIST_KEY_LSSupportsOpeningDocumentsInPlace: YES
         INFOPLIST_KEY_UIFileSharingEnabled: YES
