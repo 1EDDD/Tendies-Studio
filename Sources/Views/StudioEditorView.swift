@@ -143,6 +143,11 @@ struct StudioLayerRow: View {
                         .foregroundStyle(.secondary)
                 }
                 Spacer()
+                if layer.imageSource != nil {
+                    Image(systemName: layer.hasValidImage ? "photo.fill" : "photo.badge.exclamationmark")
+                        .font(.caption)
+                        .foregroundStyle(layer.hasValidImage ? .green : .orange)
+                }
                 Image(systemName: layer.hidden ? "eye.slash" : "eye")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -293,10 +298,25 @@ struct StudioLayerInspectorForm: View {
 
             if let source = layer.imageSource {
                 GroupBox("Asset") {
-                    Text(source)
-                        .font(.system(.caption, design: .monospaced))
-                        .foregroundStyle(.secondary)
-                        .textSelection(.enabled)
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(spacing: 7) {
+                            Image(systemName: layer.hasValidImage ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(layer.hasValidImage ? .green : .orange)
+                            Text(layer.hasValidImage ? "Asset ready" : "Asset missing")
+                                .font(.subheadline.weight(.semibold))
+                        }
+
+                        Text(source)
+                            .font(.system(.caption, design: .monospaced))
+                            .foregroundStyle(.secondary)
+                            .textSelection(.enabled)
+
+                        if !layer.hasValidImage {
+                            Text("The CAML reference exists, but the referenced file could not be resolved inside this package.")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                        }
+                    }
                 }
             }
         }
