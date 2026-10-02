@@ -3,23 +3,24 @@ import Foundation
 final class CAMLParser: NSObject, XMLParserDelegate {
     private(set) var layers: [StudioLayer] = []
     private var stack: [Int] = []
-    private var currentRoot: URL = .temporaryDirectory
     private var currentCAMLPath = ""
     private var currentSurface: LayerSurface = .background
+    private var currentCAFolder: URL = .temporaryDirectory
     private var insideContents = false
 
     func parse(data: Data, camlPath: String, surface: LayerSurface, caFolder: URL) -> [StudioLayer] {
         layers = []
         stack = []
-        currentRoot = caFolder
         currentCAMLPath = camlPath
         currentSurface = surface
+        currentCAFolder = caFolder
         insideContents = false
 
         let parser = XMLParser(data: data)
         parser.delegate = self
         parser.shouldResolveExternalEntities = false
         parser.parse()
+
         return layers
     }
 
@@ -35,33 +36,31 @@ final class CAMLParser: NSObject, XMLParserDelegate {
             return
         }
 
-        if elementName == "CGImage", insideContents, let src = attributeDict["src"], let index = stack.last {
+        if elementName == "CGImage", insideContents,
+           let src = attributeDict["src"],
+           let index = stack.last {
             layers[index].imageSource = src
             return
         }
 
-        if elementName != "CALayer" {
-            return
-        }
+        guard elementName == "CALayer" else { return }
 
         let id = attributeDict["id"] ?? UUID().uuidString
         let name = attributeDict["name"] ?? "Layer"
-        let bounds = Self.parsePairRect(attributeDict["bounds"])
+        let bounds = Self.parseRect(attributeDict["bounds"])
         let position = Self.parsePair(attributeDict["position"])
-        let width = bounds.width > 0 ? bounds.width : 100
-        let height = bounds.height > 0 ? bounds.height : 100
 
         let layer = StudioLayer(
             id: id,
             name: name,
             surface: currentSurface,
             camlPath: currentCAMLPath,
-            caFolderPath: currentRoot.path,
+            caFolderPath: currentCAFolder.path,
             imageSource: nil,
             x: position.x,
             y: position.y,
-            width: width,
-            height: height,
+            width: max(bounds.width, 1),
+            height: max(bounds.height, 1),
             rotation: Double(attributeDict["transform.rotation.z"] ?? "0") ?? 0,
             opacity: Double(attributeDict["opacity"] ?? "1") ?? 1,
             zPosition: Double(attributeDict["zPosition"] ?? "0") ?? 0,
@@ -85,29 +84,27 @@ final class CAMLParser: NSObject, XMLParserDelegate {
         }
     }
 
-
     private static func parsePair(_ value: String?) -> (x: Double, y: Double) {
         guard let value else { return (0, 0) }
-        let p = value.split(separator: " ").compactMap { Double($0) }
-        guard p.count >= 2 else { return (0, 0) }
-        return (p[0], p[1])
+        let values = value.split(separator: " ").compactMap { Double($0) }
+        guard values.count >= 2 else { return (0, 0) }
+        return (values[0], values[1])
     }
 
-    private static func parsePairRect(_ value: String?) -> (width: Double, height: Double) {
+    private static func parseRect(_ value: String?) -> (width: Double, height: Double) {
         guard let value else { return (100, 100) }
-        let p = value.split(separator: " ").compactMap { Double($0) }
-        guard p.count >= 4 else { return (100, 100) }
-        return (p[2], p[3])
+        let values = value.split(separator: " ").compactMap { Double($0) }
+        guard values.count >= 4 else { return (100, 100) }
+        return (values[2], values[3])
     }
 }
 
 enum CAMLService {
     static func discoverLayers(in workspace: URL) throws -> [StudioLayer] {
-        let fm = FileManager.default
-        guard let enumerator = fm.enumerator(
+        guard let enumerator = FileManager.default.enumerator(
             at: workspace,
             includingPropertiesForKeys: [.isDirectoryKey],
-            options: [.skipsHiddenFiles]
+            options: []
         ) else { return [] }
 
         var result: [StudioLayer] = []
@@ -115,11 +112,11 @@ enum CAMLService {
         while let url = enumerator.nextObject() as? URL {
             guard url.lastPathComponent == "main.caml" else { continue }
 
-            let components = url.pathComponents.map { $0.lowercased() }
+            let lower = url.path.lowercased()
             let surface: LayerSurface
-            if components.contains(where: { $0.contains("foreground") }) {
+            if lower.contains("foreground") {
                 surface = .foreground
-            } else if components.contains(where: { $0.contains("floating") }) {
+            } else if lower.contains("floating") {
                 surface = .floating
             } else {
                 surface = .background
@@ -133,6 +130,7 @@ enum CAMLService {
                 surface: surface,
                 caFolder: url.deletingLastPathComponent()
             )
+
             result.append(contentsOf: parsed.filter {
                 $0.id != "__capRootLayer__" &&
                 !$0.name.localizedCaseInsensitiveContains("root layer")
@@ -140,7 +138,7 @@ enum CAMLService {
         }
 
         return result.sorted {
-            if $0.surface != $1.surface {
+            if $0.surface.rawValue != $1.surface.rawValue {
                 return $0.surface.rawValue < $1.surface.rawValue
             }
             if $0.zPosition != $1.zPosition {
@@ -152,28 +150,29 @@ enum CAMLService {
 
     static func writeLayer(_ layer: StudioLayer, in workspace: URL) throws {
         guard !layer.camlPath.isEmpty else { return }
+
         let file = workspace.appendingPathComponent(layer.camlPath)
-        var text = try String(contentsOf: file, encoding: .utf8)
-
+        let text = try String(contentsOf: file, encoding: .utf8)
         let escaped = NSRegularExpression.escapedPattern(for: layer.id)
-        let pattern = "<CALayer\\b[^>]*\\bid="\(escaped)"[^>]*>"
-        guard let re = try? NSRegularExpression(pattern: pattern) else { return }
+        let pattern = "<CALayer\\\\b[^>]*\\\\bid=\"" + escaped + "\"[^>]*>"
 
-        let ns = text as NSString
-        let range = NSRange(location: 0, length: ns.length)
-        guard let match = re.firstMatch(in: text, range: range) else { return }
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        let nsText = text as NSString
+        let all = NSRange(location: 0, length: nsText.length)
+        guard let match = regex.firstMatch(in: text, range: all) else { return }
 
-        var tag = ns.substring(with: match.range)
-        tag = replaceAttribute("bounds", value: "0 0 \(Self.n(layer.width)) \(Self.n(layer.height))", in: tag)
-        tag = replaceAttribute("position", value: "\(Self.n(layer.x)) \(Self.n(layer.y))", in: tag)
-        tag = replaceAttribute("transform.rotation.z", value: Self.n(layer.rotation), in: tag)
-        tag = replaceAttribute("opacity", value: Self.n(layer.opacity), in: tag)
-        tag = replaceAttribute("zPosition", value: Self.n(layer.zPosition), in: tag)
+        var tag = nsText.substring(with: match.range)
+        tag = replaceAttribute("bounds", value: "0 0 " + n(layer.width) + " " + n(layer.height), in: tag)
+        tag = replaceAttribute("position", value: n(layer.x) + " " + n(layer.y), in: tag)
+        tag = replaceAttribute("transform.rotation.z", value: n(layer.rotation), in: tag)
+        tag = replaceAttribute("opacity", value: n(layer.opacity), in: tag)
+        tag = replaceAttribute("zPosition", value: n(layer.zPosition), in: tag)
         tag = replaceAttribute("hidden", value: layer.hidden ? "1" : "0", in: tag)
 
-        text = ns.replacingCharacters(in: match.range, with: tag)
-        text = replaceImageSource(text, layerID: layer.id, source: layer.imageSource)
-        try text.write(to: file, atomically: true, encoding: .utf8)
+        var updated = nsText.replacingCharacters(in: match.range, with: tag)
+        updated = replaceImageSource(updated, layerID: layer.id, source: layer.imageSource)
+
+        try updated.write(to: file, atomically: true, encoding: .utf8)
     }
 
     static func readText(relativePath: String, in workspace: URL) throws -> String {
@@ -186,26 +185,32 @@ enum CAMLService {
 
     private static func replaceAttribute(_ name: String, value: String, in tag: String) -> String {
         let escaped = NSRegularExpression.escapedPattern(for: name)
-        guard let re = try? NSRegularExpression(pattern: "\\b\(escaped)="[^"]*"") else {
-            return tag
-        }
-        return re.stringByReplacingMatches(
+        let pattern = "\\b" + escaped + "=\"[^\"]*\""
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return tag }
+
+        let replacement = name + "=\"" + value + "\""
+        return regex.stringByReplacingMatches(
             in: tag,
             range: NSRange(location: 0, length: (tag as NSString).length),
-            withTemplate: "\(name)="\(value)""
+            withTemplate: replacement
         )
     }
 
     private static func replaceImageSource(_ text: String, layerID: String, source: String?) -> String {
         guard let source else { return text }
+
         let escaped = NSRegularExpression.escapedPattern(for: layerID)
-        let pattern = "(<CALayer\\b[^>]*\\bid="\(escaped)"[\\s\\S]*?<contents>[\\s\\S]*?<CGImage\\s+src=")[^"]+("\\s*/>[\\s\\S]*?</contents>)"
-        guard let re = try? NSRegularExpression(pattern: pattern) else { return text }
-        let replacement = "$1\(source)$2"
-        return re.stringByReplacingMatches(
+        let pattern =
+            "(<CALayer\\\\b[^>]*\\\\bid=\"" +
+            escaped +
+            "\"[\\\\s\\\\S]*?<contents>[\\\\s\\\\S]*?<CGImage\\\\s+src=\")[^\"]+(\"\\\\s*/>[\\\\s\\\\S]*?</contents>)"
+
+        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
+
+        return regex.stringByReplacingMatches(
             in: text,
             range: NSRange(location: 0, length: (text as NSString).length),
-            withTemplate: replacement
+            withTemplate: "$1" + source + "$2"
         )
     }
 
