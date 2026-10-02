@@ -12,8 +12,10 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Install XcodeGen
-        run: brew install xcodegen
+        run: brew install xcodegen imagemagick
 
+      - name: Generate offline starter assets
+        run: bash Scripts/generate-starter-library.sh
       - name: Generate project
         run: xcodegen generate
 
