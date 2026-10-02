@@ -22,6 +22,8 @@ targets:
     platform: iOS
     sources:
       - path: Sources
+    resources:
+      - path: Resources
     info:
       path: Sources/Info.plist
     settings:
