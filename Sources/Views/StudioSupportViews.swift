@@ -7,73 +7,218 @@ struct AssetsStudioView: View {
     @State private var showingImport = false
     @State private var showingPath = false
 
+    private var starterAssets: [URL] {
+        Bundle.main.urls(forResourcesWithExtension: "png", subdirectory: "StarterLibrary") ?? []
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            HStack {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text("Assets").font(.largeTitle.bold())
-                    Text("Local media used by this wallpaper project.")
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button { showingImport = true } label: {
-                    Label("Import Image", systemImage: "plus")
-                }
-                .buttonStyle(.borderedProminent)
-                Button { showingPath = true } label: {
-                    Label("Manual Path", systemImage: "link")
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(20)
-            Divider()
+        ScrollView {
+            VStack(alignment: .leading, spacing: 22) {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Assets")
+                            .font(.largeTitle.bold())
+                        Text("Project media plus a small offline starter library.")
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button { showingImport = true } label: {
+                        Label("Import", systemImage: "plus")
+                    }
+                    .buttonStyle(.borderedProminent)
 
-            ScrollView {
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 190), spacing: 16)], spacing: 16) {
-                    ForEach(workspace.layers.filter { $0.imageSource != nil }) { layer in
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let path = layer.imageFilePath,
-                               let image = UIImage(contentsOfFile: path) {
-                                Image(uiImage: image)
-                                    .resizable()
-                                    .scaledToFit()
-                                    .frame(height: 180)
-                                    .frame(maxWidth: .infinity)
-                                    .background(.black.opacity(0.2))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
+                    Button { showingPath = true } label: {
+                        Label("Path", systemImage: "link")
+                    }
+                    .buttonStyle(.bordered)
+                }
 
-                            Text(layer.name).font(.headline).lineLimit(1)
-                            Text(layer.surface.rawValue)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-
-                            Button {
-                                workspace.selectedLayerID = layer.id
-                                workspace.activePanel = .design
-                            } label: {
-                                Label("Edit Layer", systemImage: "slider.horizontal.3")
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.bordered)
+                assetSection(title: "Project Assets") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 14)], spacing: 14) {
+                        let layers = workspace.layers.filter { $0.imageSource != nil }
+                        ForEach(layers) { layer in
+                            ProjectAssetCard(layer: layer)
                         }
-                        .padding(12)
-                        .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 16))
+
+                        if layers.isEmpty {
+                            EmptyAssetCard(
+                                title: "No project images",
+                                subtitle: "Import an image from Photos, Files or a local path."
+                            )
+                        }
                     }
                 }
-                .padding(20)
+
+                assetSection(title: "Starter Library") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 200), spacing: 14)], spacing: 14) {
+                        ForEach(starterAssets, id: \.self) { url in
+                            StarterAssetCard(url: url)
+                        }
+                    }
+                }
             }
+            .padding(22)
         }
+        .background(Color.black.opacity(0.96))
         .sheet(isPresented: $showingImport) {
             MediaImportSheet(title: "Import Image") { data, name in
                 workspace.addImageFromData(data, preferredName: name)
             }
         }
         .sheet(isPresented: $showingPath) {
-            ManualPathSheet { path in workspace.addImageFromPath(path) }
+            ManualPathSheet { path in
+                workspace.addImageFromPath(path)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func assetSection<Content: View>(
+        title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Text(title)
+                    .font(.title3.weight(.bold))
+                Spacer()
+                if title == "Starter Library" {
+                    Text("Offline")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.green)
+                }
+            }
+            content()
         }
     }
 }
+
+struct ProjectAssetCard: View {
+    @EnvironmentObject private var workspace: WorkspaceStore
+    let layer: StudioLayer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            ZStack(alignment: .topTrailing) {
+                if let path = layer.imageFilePath,
+                   let image = UIImage(contentsOfFile: path) {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(height: 185)
+                        .frame(maxWidth: .infinity)
+                        .clipped()
+                } else {
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(.white.opacity(0.04))
+                        .frame(height: 185)
+                }
+
+                Circle()
+                    .fill(layer.hasValidImage ? .green : .orange)
+                    .frame(width: 8, height: 8)
+                    .padding(12)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+            Text(layer.name)
+                .font(.headline)
+                .lineLimit(1)
+
+            HStack {
+                Text(layer.surface.rawValue)
+                Spacer()
+                Text(layer.hasValidImage ? "Ready" : "Missing")
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(.white.opacity(0.06), lineWidth: 1)
+        )
+        .onTapGesture {
+            workspace.selectedLayerID = layer.id
+            workspace.activePanel = .design
+        }
+    }
+}
+
+struct StarterAssetCard: View {
+    @EnvironmentObject private var workspace: WorkspaceStore
+    let url: URL
+
+    var title: String {
+        url.deletingPathExtension().lastPathComponent.replacingOccurrences(of: "-", with: " ")
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 9) {
+            if let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(height: 185)
+                    .frame(maxWidth: .infinity)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+            } else {
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.white.opacity(0.04))
+                    .frame(height: 185)
+            }
+
+            Text(title)
+                .font(.headline)
+
+            HStack {
+                Text("Starter")
+                Spacer()
+                Button {
+                    guard let data = try? Data(contentsOf: url) else { return }
+                    workspace.addImageFromData(data, preferredName: title)
+                } label: {
+                    Label("Use", systemImage: "plus")
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+            .font(.caption)
+            .foregroundStyle(.secondary)
+        }
+        .padding(12)
+        .background(.white.opacity(0.035), in: RoundedRectangle(cornerRadius: 15))
+        .overlay(
+            RoundedRectangle(cornerRadius: 15)
+                .stroke(.white.opacity(0.06), lineWidth: 1)
+        )
+    }
+}
+
+struct EmptyAssetCard: View {
+    let title: String
+    let subtitle: String
+
+    var body: some View {
+        VStack(spacing: 9) {
+            Image(systemName: "photo.badge.plus")
+                .font(.title2)
+                .foregroundStyle(.secondary)
+            Text(title).font(.headline)
+            Text(subtitle)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity, minHeight: 185)
+        .padding(20)
+        .background(.white.opacity(0.025), in: RoundedRectangle(cornerRadius: 15))
+    }
+}
+
 
 struct PackageStudioView: View {
     @EnvironmentObject private var workspace: WorkspaceStore
