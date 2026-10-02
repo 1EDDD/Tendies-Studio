@@ -269,17 +269,20 @@ struct MediaImportSheet: View {
                 allowedContentTypes: [.image],
                 allowsMultipleSelection: false
             ) { result in
-                if case .success(let urls) = result, let url = urls.first,
-                   let data = try? Data(contentsOf: url) {
-                    completion(data, url.deletingPathExtension().lastPathComponent)
-                    dismiss()
+                if case .success(let urls) = result, let url = urls.first {
+                    do {
+                        let data = try MediaImportService.readData(from: url)
+                        completion(data, MediaImportService.suggestedName(for: url))
+                        dismiss()
+                    } catch {
+                    }
                 }
             }
             .sheet(isPresented: $showingPath) {
                 ManualPathSheet { path in
                     let url = URL(fileURLWithPath: path)
-                    if let data = try? Data(contentsOf: url) {
-                        completion(data, url.deletingPathExtension().lastPathComponent)
+                    if let data = try? MediaImportService.readData(from: url) {
+                        completion(data, MediaImportService.suggestedName(for: url))
                         dismiss()
                     }
                 }
