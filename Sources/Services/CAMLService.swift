@@ -35,16 +35,17 @@ final class CAMLParser: NSObject, XMLParserDelegate {
             return
         }
 
+        if elementName == "CGImage", insideContents, let src = attributeDict["src"], let index = stack.last {
+            layers[index].imageSource = src
+            return
+        }
+
         if elementName != "CALayer" {
             return
         }
 
         let id = attributeDict["id"] ?? UUID().uuidString
         let name = attributeDict["name"] ?? "Layer"
-        if name.localizedCaseInsensitiveContains("root layer") && attributeDict["id"] == nil {
-            return
-        }
-
         let bounds = Self.parsePairRect(attributeDict["bounds"])
         let position = Self.parsePair(attributeDict["position"])
         let width = bounds.width > 0 ? bounds.width : 100
@@ -84,26 +85,6 @@ final class CAMLParser: NSObject, XMLParserDelegate {
         }
     }
 
-    func parser(
-        _ parser: XMLParser,
-        foundEmptyElement name: String,
-        attributes attributeDict: [String : String]
-    ) {
-        if name == "CGImage", insideContents, let src = attributeDict["src"], let index = stack.last {
-            layers[index].imageSource = src
-        }
-    }
-
-    func parser(
-        _ parser: XMLParser,
-        didStartElement elementName: String,
-        namespaceURI: String?,
-        qualifiedName qName: String?
-    ) {
-        if elementName == "contents" {
-            insideContents = true
-        }
-    }
 
     private static func parsePair(_ value: String?) -> (x: Double, y: Double) {
         guard let value else { return (0, 0) }
@@ -146,12 +127,16 @@ enum CAMLService {
 
             let data = try Data(contentsOf: url)
             let relative = String(url.path.dropFirst(workspace.path.count + 1))
-            result.append(contentsOf: CAMLParser().parse(
+            let parsed = CAMLParser().parse(
                 data: data,
                 camlPath: relative,
                 surface: surface,
                 caFolder: url.deletingLastPathComponent()
-            ))
+            )
+            result.append(contentsOf: parsed.filter {
+                $0.id != "__capRootLayer__" &&
+                !$0.name.localizedCaseInsensitiveContains("root layer")
+            })
         }
 
         return result.sorted {
