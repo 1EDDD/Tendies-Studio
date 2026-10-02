@@ -127,51 +127,53 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
+        guard let image = UIImage(data: data), let png = image.pngData() else {
+            errorMessage = "The selected image could not be decoded."
+            return
+        }
+
         isBusy = true
         status = "Adding image…"
+        errorMessage = nil
 
         Task {
             do {
-                let targetSurface: LayerSurface = selectedLayer?.surface ?? .background
-                let targetCAML = layers.first(where: { $0.surface == targetSurface })?.camlPath
-                    ?? layers.first?.camlPath
+                let targetSurface = selectedLayer?.surface ?? .background
+                let camlURL = try writableCAMLURL(for: targetSurface, root: root)
 
-                guard let camlPath = targetCAML else {
-                    throw TendiesArchiveError.exportFailed
-                }
-
-                let caFolder = root
-                    .appendingPathComponent(camlPath)
-                    .deletingLastPathComponent()
+                let caFolder = camlURL.deletingLastPathComponent()
                 let assets = caFolder.appendingPathComponent("assets", isDirectory: true)
                 try FileManager.default.createDirectory(at: assets, withIntermediateDirectories: true)
 
-                let sanitized = preferredName
-                    .replacingOccurrences(of: "/", with: "-")
-                    .replacingOccurrences(of: ":", with: "-")
-                let filename = "\(sanitized)-\(UUID().uuidString.prefix(6)).png"
-                let imageURL = assets.appendingPathComponent(filename)
-
-                guard let image = UIImage(data: data), let png = image.pngData() else {
-                    throw TendiesArchiveError.exportFailed
-                }
+                let sanitized = sanitizeFilename(preferredName)
+                let filename = "\(sanitized.isEmpty ? "Image" : sanitized)-\(UUID().uuidString.prefix(8)).png"
+                let imageURL = assets.appendingPathComponent(filename, isDirectory: false)
                 try png.write(to: imageURL, options: .atomic)
 
-                try insertImageLayer(
-                    id: UUID().uuidString.replacingOccurrences(of: "-", with: ""),
-                    name: sanitized,
+                let layerID = UUID().uuidString.replacingOccurrences(of: "-", with: "")
+                let newLayer = try insertImageLayer(
+                    id: layerID,
+                    name: sanitized.isEmpty ? "Image" : sanitized,
                     imageSource: "assets/\(filename)",
-                    camlFile: root.appendingPathComponent(camlPath),
+                    imagePath: imageURL.path,
+                    camlFile: camlURL,
                     width: projectSettings.width,
                     height: projectSettings.height
                 )
 
-                try reloadLayers()
-                selectedLayerID = layers.last?.id
+                layers.removeAll { $0.id == newLayer.id }
+                layers.append(newLayer)
+                layers.sort {
+                    if $0.surface.rawValue != $1.surface.rawValue {
+                        return $0.surface.rawValue < $1.surface.rawValue
+                    }
+                    return $0.zPosition < $1.zPosition
+                }
+                selectedLayerID = newLayer.id
                 refresh()
                 status = "Image added"
             } catch {
-                errorMessage = error.localizedDescription
+                errorMessage = "Image import failed: \(error.localizedDescription)"
                 status = "Image import failed"
             }
             isBusy = false
@@ -302,28 +304,101 @@ final class WorkspaceStore: ObservableObject {
         }
     }
 
+    private func writableCAMLURL(for surface: LayerSurface, root: URL) throws -> URL {
+        let named = entries
+            .filter { !$0.isDirectory && $0.fileExtension == "caml" && $0.name.lowercased() == "main.caml" }
+            .map { root.appendingPathComponent($0.path) }
+
+        if let exact = named.first(where: {
+            let lower = $0.path.lowercased()
+            switch surface {
+            case .background: return lower.contains("background")
+            case .floating: return lower.contains("floating")
+            case .foreground: return lower.contains("foreground")
+            }
+        }) {
+            return exact
+        }
+
+        if let layerPath = layers.first(where: { $0.surface == surface })?.camlPath {
+            let url = root.appendingPathComponent(layerPath)
+            if FileManager.default.fileExists(atPath: url.path) {
+                return url
+            }
+        }
+
+        guard let first = named.first else {
+            throw TendiesArchiveError.exportFailed
+        }
+        return first
+    }
+
     private func insertImageLayer(
         id: String,
         name: String,
         imageSource: String,
+        imagePath: String,
         camlFile: URL,
         width: Double,
         height: Double
-    ) throws {
+    ) throws -> StudioLayer {
         var xml = try String(contentsOf: camlFile, encoding: .utf8)
+
         let layer = """
 <CALayer id="\(id)" name="\(xmlEscape(name))" bounds="0 0 \(n(width)) \(n(height))" position="\(n(width / 2)) \(n(height / 2))" zPosition="100" geometryFlipped="0" opacity="1" transform.rotation.z="0" allowsEdgeAntialiasing="1" allowsGroupOpacity="1" contentsFormat="RGBA8" cornerCurve="circular">
   <contents><CGImage src="\(imageSource)"/></contents>
 </CALayer>
 """
 
-        guard let end = xml.range(of: "</sublayers>") else {
-            throw TendiesArchiveError.exportFailed
+        if let end = xml.range(of: "</sublayers>") {
+            xml.insert(contentsOf: layer, at: end.lowerBound)
+        } else {
+            guard let end = xml.range(of: "</CALayer>") else {
+                throw TendiesArchiveError.exportFailed
+            }
+            xml.insert(contentsOf: layer, at: end.lowerBound)
         }
 
-        xml.insert(contentsOf: layer, at: end.lowerBound)
         try xml.write(to: camlFile, atomically: true, encoding: .utf8)
+
+        return StudioLayer(
+            id: id,
+            name: name,
+            surface: surfaceForCAML(relativePath(of: camlFile)),
+            camlPath: relativePath(of: camlFile),
+            caFolderPath: camlFile.deletingLastPathComponent().path,
+            imageSource: imageSource,
+            resolvedImagePath: imagePath,
+            x: width / 2,
+            y: height / 2,
+            width: width,
+            height: height,
+            rotation: 0,
+            opacity: 1,
+            zPosition: 100,
+            hidden: false
+        )
     }
+
+    private func relativePath(of url: URL) -> String {
+        guard let root = workspaceURL else { return url.lastPathComponent }
+        return String(url.path.dropFirst(root.path.count + 1))
+    }
+
+    private func surfaceForCAML(_ path: String) -> LayerSurface {
+        let lower = path.lowercased()
+        if lower.contains("foreground") { return .foreground }
+        if lower.contains("floating") { return .floating }
+        return .background
+    }
+
+    private func sanitizeFilename(_ value: String) -> String {
+        value
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ":", with: "-")
+            .replacingOccurrences(of: " ", with: "-")
+    }
+
 
     private func makeProjectRoot(named name: String) throws -> URL {
         let base = try applicationProjectsDirectory()
