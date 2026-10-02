@@ -23,7 +23,7 @@ targets:
     sources:
       - path: Sources
     resources:
-      - path: Resources
+      - path: Resources/StarterLibrary
     info:
       path: Sources/Info.plist
     settings:
