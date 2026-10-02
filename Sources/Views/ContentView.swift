@@ -5,6 +5,7 @@ struct ContentView: View {
     @EnvironmentObject private var workspace: WorkspaceStore
     @State private var showingImporter = false
     @State private var showingExporter = false
+    @State private var showingImageCreator = false
     @State private var selectedTab = "Workspace"
     @State private var exportDocument: TendiesExportDocument?
 
@@ -19,6 +20,14 @@ struct ContentView: View {
         .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.tendies, .zip, .data], allowsMultipleSelection: false) { result in
             if case .success(let urls) = result, let url = urls.first { workspace.open(url) }
             if case .failure(let error) = result { workspace.errorMessage = error.localizedDescription }
+        }
+        .fileImporter(isPresented: $showingImageCreator, allowedContentTypes: [.image], allowsMultipleSelection: false) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                workspace.createFromImage(url)
+            }
+            if case .failure(let error) = result {
+                workspace.errorMessage = error.localizedDescription
+            }
         }
         .fileExporter(
             isPresented: $showingExporter,
@@ -39,6 +48,10 @@ struct ContentView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { showingImporter = true } label: { Label("Open", systemImage: "folder") }
+                Button { showingImageCreator = true } label: {
+                    Label("New from Image", systemImage: "photo.badge.plus")
+                }
+                .disabled(workspace.workspaceURL == nil || workspace.isBusy)
                 Button { prepareExport() } label: { Label("Export", systemImage: "square.and.arrow.up") }
                     .disabled(workspace.workspaceURL == nil || workspace.isBusy)
             }
@@ -152,7 +165,8 @@ struct WelcomeView: View {
                 Label("Open a .tendies package", systemImage: "folder.badge.plus")
                     .font(.headline).padding(.horizontal, 24).padding(.vertical, 14)
             }.buttonStyle(.borderedProminent)
-            Text("New projects from validated templates are coming next.")
+            Text("Open a known-good package first, then use New from Image to clone it as a wallpaper template.")
+
                 .font(.footnote).foregroundStyle(.tertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
