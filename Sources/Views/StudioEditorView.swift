@@ -277,7 +277,7 @@ struct StudioInspector: View {
                                     "Visible",
                                     isOn: Binding(
                                         get: { !layer.hidden },
-                                        set: { update(layer) { $0.hidden = !$0.hidden } }
+                                        set: { newValue in update(layer) { $0.hidden = !newValue } }
                                     )
                                 )
                             }
