@@ -1,13 +1,23 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
+extension UTType {
+    static let tendies = UTType(exportedAs: "com.1eddd.tendies", conformingTo: .zip)
+}
+
 struct TendiesExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [.data] }
-    init() {}
-    init(configuration: ReadConfiguration) throws {}
+    static var readableContentTypes: [UTType] { [.tendies, .zip, .data] }
+    let data: Data
+
+    init(data: Data = Data()) {
+        self.data = data
+    }
+
+    init(configuration: ReadConfiguration) throws {
+        data = configuration.file.regularFileContents ?? Data()
+    }
+
     func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        // Export is handled by the workspace archive service. This document is a placeholder
-        // required by SwiftUI's fileExporter API; the next iteration will use a custom exporter.
-        FileWrapper(regularFileWithContents: Data())
+        FileWrapper(regularFileWithContents: data)
     }
 }
