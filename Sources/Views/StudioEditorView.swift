@@ -266,63 +266,7 @@ struct StudioInspector: View {
 
             ScrollView {
                 if let layer = workspace.selectedLayer {
-                    VStack(alignment: .leading, spacing: 18) {
-                        GroupBox("Layer") {
-                            VStack(alignment: .leading, spacing: 9) {
-                                Text(layer.name).font(.headline)
-                                Text(layer.surface.rawValue)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Toggle(
-                                    "Visible",
-                                    isOn: Binding(
-                                        get: { !layer.hidden },
-                                        set: { newValue in update(layer) { $0.hidden = !newValue } }
-                                    )
-                                )
-                            }
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-
-                        GroupBox("Transform") {
-                            VStack(spacing: 10) {
-                                field("X", layer.x) { value in update(layer) { $0.x = value } }
-                                field("Y", layer.y) { value in update(layer) { $0.y = value } }
-                                field("Width", layer.width) { value in update(layer) { $0.width = max(1, value) } }
-                                field("Height", layer.height) { value in update(layer) { $0.height = max(1, value) } }
-                                field("Rotation", layer.rotation) { value in update(layer) { $0.rotation = value } }
-                                field("Z", layer.zPosition) { value in update(layer) { $0.zPosition = value } }
-                            }
-                        }
-
-                        GroupBox("Appearance") {
-                            VStack(alignment: .leading, spacing: 10) {
-                                HStack {
-                                    Text("Opacity")
-                                    Spacer()
-                                    Text("\(Int(layer.opacity * 100))%")
-                                        .foregroundStyle(.secondary)
-                                }
-                                Slider(
-                                    value: Binding(
-                                        get: { layer.opacity },
-                                        set: { update(layer) { $0.opacity = $1 } }
-                                    ),
-                                    in: 0...1
-                                )
-                            }
-                        }
-
-                        if let source = layer.imageSource {
-                            GroupBox("Asset") {
-                                Text(source)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .foregroundStyle(.secondary)
-                                    .textSelection(.enabled)
-                            }
-                        }
-                    }
-                    .padding(16)
+                    StudioLayerInspectorForm(layer: layer)
                 } else {
                     ContentUnavailableView(
                         "Select a layer",
@@ -335,21 +279,115 @@ struct StudioInspector: View {
         }
         .background(.thinMaterial)
     }
+}
 
-    private func field(_ title: String, _ value: Double, change: @escaping (Double) -> Void) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            TextField("", value: Binding(get: { value }, set: change), format: .number)
-                .multilineTextAlignment(.trailing)
-                .frame(width: 95)
-                .textFieldStyle(.roundedBorder)
+struct StudioLayerInspectorForm: View {
+    @EnvironmentObject private var workspace: WorkspaceStore
+    let layer: StudioLayer
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 18) {
+            layerCard
+            transformCard
+            appearanceCard
+
+            if let source = layer.imageSource {
+                GroupBox("Asset") {
+                    Text(source)
+                        .font(.system(.caption, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            }
+        }
+        .padding(16)
+    }
+
+    private var layerCard: some View {
+        GroupBox("Layer") {
+            VStack(alignment: .leading, spacing: 9) {
+                Text(layer.name).font(.headline)
+                Text(layer.surface.rawValue)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Toggle(
+                    "Visible",
+                    isOn: Binding(
+                        get: { !layer.hidden },
+                        set: { newValue in
+                            apply { $0.hidden = !newValue }
+                        }
+                    )
+                )
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
-    private func update(_ source: StudioLayer, change: (inout StudioLayer) -> Void) {
-        var value = source
-        change(&value)
-        workspace.updateLayer(value)
+    private var transformCard: some View {
+        GroupBox("Transform") {
+            VStack(spacing: 10) {
+                numericField(title: "X", value: layer.x) { $0.x = $1 }
+                numericField(title: "Y", value: layer.y) { $0.y = $1 }
+                numericField(title: "Width", value: layer.width) { $0.width = max(1, $1) }
+                numericField(title: "Height", value: layer.height) { $0.height = max(1, $1) }
+                numericField(title: "Rotation", value: layer.rotation) { $0.rotation = $1 }
+                numericField(title: "Z", value: layer.zPosition) { $0.zPosition = $1 }
+            }
+        }
+    }
+
+    private var appearanceCard: some View {
+        GroupBox("Appearance") {
+            VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text("Opacity")
+                    Spacer()
+                    Text("\(Int(layer.opacity * 100))%")
+                        .foregroundStyle(.secondary)
+                }
+
+                Slider(
+                    value: Binding(
+                        get: { layer.opacity },
+                        set: { newValue in apply { $0.opacity = newValue } }
+                    ),
+                    in: 0...1
+                )
+            }
+        }
+    }
+
+    private func numericField(
+        title: String,
+        value: Double,
+        change: @escaping (inout StudioLayer, Double) -> Void
+    ) -> some View {
+        HStack {
+            Text(title)
+            Spacer()
+            TextField(
+                "",
+                value: Binding(
+                    get: { value },
+                    set: { newValue in
+                        apply { layerValue in
+                            change(&layerValue, newValue)
+                        }
+                    }
+                ),
+                format: .number
+            )
+            .multilineTextAlignment(.trailing)
+            .frame(width: 95)
+            .textFieldStyle(.roundedBorder)
+        }
+    }
+
+    private func apply(_ change: (inout StudioLayer) -> Void) {
+        var updated = layer
+        change(&updated)
+        workspace.updateLayer(updated)
     }
 }
