@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct PackageOverviewView: View {
     @EnvironmentObject private var workspace: WorkspaceStore
