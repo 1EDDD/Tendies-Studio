@@ -154,7 +154,7 @@ enum CAMLService {
         let file = workspace.appendingPathComponent(layer.camlPath)
         let text = try String(contentsOf: file, encoding: .utf8)
         let escaped = NSRegularExpression.escapedPattern(for: layer.id)
-        let pattern = "<CALayer\\\\b[^>]*\\\\bid=\"" + escaped + "\"[^>]*>"
+        let pattern = "<CALayer\\b[^>]*\\bid=\"" + escaped + "\"[^>]*>"
 
         guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
         let nsText = text as NSString
@@ -170,7 +170,6 @@ enum CAMLService {
         tag = replaceAttribute("hidden", value: layer.hidden ? "1" : "0", in: tag)
 
         var updated = nsText.replacingCharacters(in: match.range, with: tag)
-        updated = replaceImageSource(updated, layerID: layer.id, source: layer.imageSource)
 
         try updated.write(to: file, atomically: true, encoding: .utf8)
     }
@@ -193,24 +192,6 @@ enum CAMLService {
             in: tag,
             range: NSRange(location: 0, length: (tag as NSString).length),
             withTemplate: replacement
-        )
-    }
-
-    private static func replaceImageSource(_ text: String, layerID: String, source: String?) -> String {
-        guard let source else { return text }
-
-        let escaped = NSRegularExpression.escapedPattern(for: layerID)
-        let pattern =
-            "(<CALayer\\\\b[^>]*\\\\bid=\"" +
-            escaped +
-            "\"[\\\\s\\\\S]*?<contents>[\\\\s\\\\S]*?<CGImage\\\\s+src=\")[^\"]+(\"\\\\s*/>[\\\\s\\\\S]*?</contents>)"
-
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return text }
-
-        return regex.stringByReplacingMatches(
-            in: text,
-            range: NSRange(location: 0, length: (text as NSString).length),
-            withTemplate: "$1" + source + "$2"
         )
     }
 
