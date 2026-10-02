@@ -199,12 +199,12 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
-        guard let data = try? Data(contentsOf: url) else {
+        guard let data = try? MediaImportService.readData(from: url) else {
             errorMessage = "The file could not be read."
             return
         }
 
-        addImageFromData(data, preferredName: url.deletingPathExtension().lastPathComponent)
+        addImageFromData(data, preferredName: MediaImportService.suggestedName(for: url))
     }
 
     func replaceImage(for layerID: String, with data: Data) {
@@ -214,11 +214,11 @@ final class WorkspaceStore: ObservableObject {
             return
         }
 
-        let url = root.appendingPathComponent(layer.caFolderPath)
-            .appendingPathComponent(source)
-            .standardizedFileURL
+        let caFolderURL = URL(fileURLWithPath: layer.caFolderPath).standardizedFileURL
+        let url = caFolderURL.appendingPathComponent(source).standardizedFileURL
 
-        guard url.path.hasPrefix(root.path + "/") else {
+        guard caFolderURL.path.hasPrefix(root.path + "/"),
+              url.path.hasPrefix(root.path + "/") else {
             errorMessage = "Unsafe asset path."
             return
         }
