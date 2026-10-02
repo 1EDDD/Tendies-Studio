@@ -699,12 +699,12 @@ private struct TransformSection: View {
     var body: some View {
         InspectorCard(title: "Transform") {
             VStack(spacing: 9) {
-                twoColumn("X", layer.x) { update { $0.x = $1 } }
-                twoColumn("Y", layer.y) { update { $0.y = $1 } }
-                twoColumn("Width", layer.width) { update { $0.width = max(1, $1) } }
-                twoColumn("Height", layer.height) { update { $0.height = max(1, $1) } }
-                twoColumn("Rotation", layer.rotation) { update { $0.rotation = $1 } }
-                twoColumn("Z", layer.zPosition) { update { $0.zPosition = $1 } }
+                twoColumn("X", layer.x) { $0.x = $1 }
+                twoColumn("Y", layer.y) { $0.y = $1 }
+                twoColumn("Width", layer.width) { $0.width = max(1, $1) }
+                twoColumn("Height", layer.height) { $0.height = max(1, $1) }
+                twoColumn("Rotation", layer.rotation) { $0.rotation = $1 }
+                twoColumn("Z", layer.zPosition) { $0.zPosition = $1 }
             }
         }
     }
@@ -712,7 +712,7 @@ private struct TransformSection: View {
     private func twoColumn(
         _ title: String,
         _ value: Double,
-        _ change: @escaping (inout StudioLayer, Double) -> Void
+        change: @escaping (inout StudioLayer, Double) -> Void
     ) -> some View {
         HStack {
             Text(title).font(.subheadline)
@@ -722,9 +722,9 @@ private struct TransformSection: View {
                 value: Binding(
                     get: { value },
                     set: { newValue in
-                        update({ layerValue, value in
-                            change(&layerValue, value)
-                        }, value: newValue)
+                        var updated = workspace.selectedLayer ?? layer
+                        change(&updated, newValue)
+                        workspace.updateLayer(updated)
                     }
                 ),
                 format: .number
@@ -733,12 +733,6 @@ private struct TransformSection: View {
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
         }
-    }
-
-    private func update(_ change: (inout StudioLayer, Double) -> Void, value: Double = 0) {
-        guard var changed = workspace.selectedLayer else { return }
-        change(&changed, value)
-        workspace.updateLayer(changed)
     }
 }
 
