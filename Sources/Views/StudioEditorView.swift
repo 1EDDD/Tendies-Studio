@@ -722,9 +722,9 @@ private struct TransformSection: View {
                 value: Binding(
                     get: { value },
                     set: { newValue in
-                        update { layerValue in
-                            change(&layerValue, newValue)
-                        }
+                        update({ layerValue, value in
+                            change(&layerValue, value)
+                        }, value: newValue)
                     }
                 ),
                 format: .number
@@ -735,14 +735,10 @@ private struct TransformSection: View {
         }
     }
 
-    private func update(_ change: (inout StudioLayer, Double) -> Void) {
-        guard var value = workspace.selectedLayer else { return }
-        let old = value
-        var changed = old
-        change(&changed, changed.x)
-        if old != changed {
-            workspace.updateLayer(changed)
-        }
+    private func update(_ change: (inout StudioLayer, Double) -> Void, value: Double = 0) {
+        guard var changed = workspace.selectedLayer else { return }
+        change(&changed, value)
+        workspace.updateLayer(changed)
     }
 }
 
