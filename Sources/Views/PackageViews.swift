@@ -57,24 +57,70 @@ struct PackageBrowserView: View {
 
 struct AssetBrowserView: View {
     @EnvironmentObject private var workspace: WorkspaceStore
-    private let columns = [GridItem(.adaptive(minimum: 150), spacing: 14)]
+    @State private var showingImporter = false
+    @State private var targetPath: String?
+    private let columns = [GridItem(.adaptive(minimum: 170), spacing: 14)]
+
     var body: some View {
         ScrollView {
             LazyVGrid(columns: columns, spacing: 14) {
-                ForEach(workspace.entries.filter { ["png","jpg","jpeg","heic"].contains($0.fileExtension) }) { entry in
-                    VStack(alignment: .leading, spacing: 7) {
+                ForEach(workspace.entries.filter {
+                    ["png", "jpg", "jpeg", "heic"].contains($0.fileExtension)
+                }) { entry in
+                    VStack(alignment: .leading, spacing: 8) {
                         if let root = workspace.workspaceURL,
                            let image = UIImage(contentsOfFile: root.appendingPathComponent(entry.path).path) {
-                            Image(uiImage: image).resizable().scaledToFit().frame(height: 150)
-                                .frame(maxWidth: .infinity).background(.black.opacity(0.2)).clipShape(RoundedRectangle(cornerRadius: 10))
+                            Image(uiImage: image)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(height: 150)
+                                .frame(maxWidth: .infinity)
+                                .background(.black.opacity(0.2))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                         } else {
-                            RoundedRectangle(cornerRadius: 10).fill(.quaternary).frame(height: 150)
-                                .overlay(Image(systemName: "photo").font(.largeTitle).foregroundStyle(.secondary))
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(.quaternary)
+                                .frame(height: 150)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .font(.largeTitle)
+                                        .foregroundStyle(.secondary)
+                                )
                         }
-                        Text(entry.name).font(.caption).lineLimit(1)
+
+                        Text(entry.name)
+                            .font(.caption)
+                            .lineLimit(1)
+
+                        Button {
+                            targetPath = entry.path
+                            showingImporter = true
+                        } label: {
+                            Label("Replace", systemImage: "arrow.triangle.2.circlepath")
+                                .font(.caption)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(workspace.isBusy)
                     }
+                    .padding(10)
+                    .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 14))
                 }
             }
+            .padding(.vertical, 4)
+        }
+        .fileImporter(
+            isPresented: $showingImporter,
+            allowedContentTypes: [.image],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first, let targetPath {
+                workspace.replaceImage(at: targetPath, with: url)
+            }
+            if case .failure(let error) = result {
+                workspace.errorMessage = error.localizedDescription
+            }
+            targetPath = nil
         }
     }
 }
