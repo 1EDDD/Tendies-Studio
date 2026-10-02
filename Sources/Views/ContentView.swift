@@ -64,17 +64,17 @@ struct ContentView: View {
     }
 
     private var sidebar: some View {
-        List(selection: $selectedTab) {
+        List {
             Section("PROJECT") {
-                Label("Workspace", systemImage: "square.grid.2x2").tag("Workspace")
-                Label("Assets", systemImage: "photo.on.rectangle").tag("Assets")
-                Label("Structure", systemImage: "list.bullet.indent").tag("Structure")
-                Label("Validation", systemImage: "checkmark.shield").tag("Validation")
+                sidebarButton("Workspace", "square.grid.2x2")
+                sidebarButton("Assets", "photo.on.rectangle")
+                sidebarButton("Structure", "list.bullet.indent")
+                sidebarButton("Validation", "checkmark.shield")
             }
             Section("TOOLS") {
-                Label("Layer Editor", systemImage: "square.3.layers.3d").tag("Layers")
-                Label("CAML Inspector", systemImage: "curlybraces").tag("CAML")
-                Label("Metadata", systemImage: "doc.text.magnifyingglass").tag("Metadata")
+                sidebarButton("Layers", "square.3.layers.3d", title: "Layer Editor")
+                sidebarButton("CAML", "curlybraces", title: "CAML Inspector")
+                sidebarButton("Metadata", "doc.text.magnifyingglass")
             }
         }
         .listStyle(.sidebar)
@@ -86,6 +86,22 @@ struct ContentView: View {
                 Spacer()
             }.padding()
         }
+    }
+
+    private func sidebarButton(_ tab: String, _ systemImage: String, title: String? = nil) -> some View {
+        Button {
+            selectedTab = tab
+        } label: {
+            Label(title ?? tab, systemImage: systemImage)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .contentShape(Rectangle())
+        .listRowBackground(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(selectedTab == tab ? Color.accentColor.opacity(0.14) : .clear)
+                .padding(.horizontal, 4)
+        )
     }
 
     @ViewBuilder private var workspaceView: some View {
